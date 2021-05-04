@@ -4,7 +4,11 @@ use std::thread;
 
 
 fn main() -> Result<(), std::io::Error> {
-    let listener = TcpListener::bind("127.0.0.1:5555")?;
+    start_server("127.0.0.1:5555")
+}
+
+fn start_server(addr: &str) -> Result<(), std::io::Error> {
+    let listener = TcpListener::bind(addr)?;
 
     for stream in listener.incoming() {
         thread::spawn(move || {
@@ -14,7 +18,6 @@ fn main() -> Result<(), std::io::Error> {
 
     Ok(())
 }
-
 
 fn handle_client(mut stream: TcpStream) {
     println!("new conn port {}", stream.peer_addr().unwrap());
