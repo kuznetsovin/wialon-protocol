@@ -37,7 +37,7 @@ impl Server {
         }
     }
 
-    fn start_server(&'static self) -> Result<(), std::io::Error> {
+    fn start_server(self) -> Result<(), std::io::Error> {
         let listener = TcpListener::bind(self.addr)?;
 
         for stream in listener.incoming() {
