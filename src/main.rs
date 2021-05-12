@@ -3,20 +3,33 @@ use std::io::Read;
 use std::thread;
 
 
-fn main() -> Result<(), std::io::Error> {
-    start_server("127.0.0.1:5555")
+struct Server {
+    addr: &'static str
 }
 
-fn start_server(addr: &str) -> Result<(), std::io::Error> {
-    let listener = TcpListener::bind(addr)?;
+impl Server {
+    fn new(ip_addr: &'static str) -> Server {
+        Server{ addr: ip_addr }
+    }
 
-    for stream in listener.incoming() {
-        thread::spawn(move || {
-            handle_client(stream.unwrap());
-        });
-    };
+    fn start_server(self) -> Result<(), std::io::Error> {
+        let listener = TcpListener::bind(self.addr)?;
 
-    Ok(())
+        for stream in listener.incoming() {
+            thread::spawn(move || {
+                handle_client(stream.unwrap());
+            });
+        };
+
+        Ok(())
+    }
+}
+
+
+fn main() -> Result<(), std::io::Error> {
+    let s = Server::new("127.0.0.1:5555");
+
+    s.start_server()
 }
 
 fn handle_client(mut stream: TcpStream) {
