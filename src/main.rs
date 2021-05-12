@@ -2,22 +2,47 @@ use std::net::{TcpListener, TcpStream};
 use std::io::Read;
 use std::thread;
 
-
-struct Server {
-    addr: &'static str
-}
+#[derive(Copy, Clone)]
+struct Server {addr: &'static str}
 
 impl Server {
     fn new(ip_addr: &'static str) -> Server {
         Server{ addr: ip_addr }
     }
 
-    fn start_server(self) -> Result<(), std::io::Error> {
+    fn conn_handler(self, mut stream: TcpStream) {
+        println!("new conn port {}", stream.peer_addr().unwrap());
+        loop {
+            let mut buf = [0; 1024];
+            match stream.read(&mut buf) {
+                Ok(n) => {
+                    if n == 0 {
+                        break;
+                    }
+
+                    match parse_packet(&buf[0..n]){
+                        Ok(t) => {
+                            println!("{}", t);
+                        }
+                        Err(err) => {
+                            println!("{}", err);
+                        }
+                    }
+                }
+
+                Err(err) => {
+                    panic!("{}", err);
+                }
+            }
+        }
+    }
+
+    fn start_server(&'static self) -> Result<(), std::io::Error> {
         let listener = TcpListener::bind(self.addr)?;
 
         for stream in listener.incoming() {
             thread::spawn(move || {
-                handle_client(stream.unwrap());
+                self.conn_handler(stream.unwrap());
             });
         };
 
@@ -32,32 +57,6 @@ fn main() -> Result<(), std::io::Error> {
     s.start_server()
 }
 
-fn handle_client(mut stream: TcpStream) {
-    println!("new conn port {}", stream.peer_addr().unwrap());
-    loop {
-        let mut buf = [0; 1024];
-        match stream.read(&mut buf) {
-            Ok(n) => {
-                 if n == 0 {
-                    break;
-                 }
-
-                match parse_packet(&buf[0..n]){
-                    Ok(t) => {
-                        println!("{}", t);
-                    }
-                    Err(err) => {
-                        println!("{}", err);
-                    }
-                }
-            }
-
-            Err(err) => {
-                panic!("{}", err);
-            }
-        }
-    }
-}
 
 fn parse_packet(b: &[u8]) -> Result<String, &str> {
     if b[0] == 0x23 && b[b.len()-2..] == [0x0D, 0x0A] {
