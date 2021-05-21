@@ -19,7 +19,7 @@ async fn start_server(ip_addr: &str) -> Result<(), Box<dyn Error>> {
                             break;
                         }
 
-                        match wialon::parse_packet(&buf[0..n]){
+                        match wialon::Packet::new(&buf[0..n]){
                             Ok(t) => println!("{}", t),
                             Err(err) => eprintln!("err: {:?}", err)
                         }
@@ -36,5 +36,5 @@ async fn start_server(ip_addr: &str) -> Result<(), Box<dyn Error>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    start_server("127.0.0.1:5555").await
+    start_server("0.0.0.0:5555").await
 }
