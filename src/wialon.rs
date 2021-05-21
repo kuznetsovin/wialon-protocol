@@ -10,8 +10,9 @@ impl Packet {
     pub fn new(msg: &[u8]) -> Result<Packet, &str> {
         let s = String::from_utf8(msg.to_vec()).unwrap();
         if s.starts_with("#") && s.ends_with("\r\n") {
+            let parts: Vec<&str> = s.trim_start_matches('#').trim_end().split("#").collect(); 
 
-            Ok(Packet{ptype: "L".to_string(), body: "1;1".to_string()})
+            Ok(Packet{ptype: parts[0].to_string(), body: parts[1].to_string()})
         } else {
             Err("Не корректное сообщение")
         }
