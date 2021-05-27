@@ -19,7 +19,7 @@ async fn start_server(ip_addr: &str) -> Result<(), Box<dyn Error>> {
                             break;
                         }
 
-                        match wialon::Packet::new(&buf[0..n]){
+                        match wialon::parse_packet(&buf[0..n]){
                             Ok(t) => println!("{}", t),
                             Err(err) => eprintln!("err: {:?}", err)
                         }
