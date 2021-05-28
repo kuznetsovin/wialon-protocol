@@ -1,5 +1,6 @@
 use core::any::Any;
 use std::fmt;
+use chrono::NaiveDateTime;
 
 trait BodyParser: fmt::Debug + fmt::Display{
     fn as_any(&self) -> &dyn Any;
@@ -37,8 +38,9 @@ impl PartialEq for LoginPacket {
 
 #[derive(Debug)]
 pub struct ShortDataPacket {
-    date: String,
-    time: String,
+    // date: String,
+    // time: String,
+    timestamp: NaiveDateTime,
     lat: String,
     lat_dir: String,
     lon: String,
@@ -51,9 +53,12 @@ pub struct ShortDataPacket {
 
 impl From<Vec<&str>> for ShortDataPacket {
     fn from(body: Vec<&str>) -> Self {
+        let mut ts: String = body[0].to_string();
+        ts.push_str(body[1]);
         ShortDataPacket{
-            date: body[0].to_string(),
-            time: body[1].to_string(),
+            timestamp:  NaiveDateTime::parse_from_str(ts.as_str(), "%d%m%y%H%M%S").unwrap(),
+            // date: body[0].to_string(),
+            // time: body[1].to_string(),
             lat: body[2].to_string(),
             lat_dir: body[3].to_string(),
             lon: body[4].to_string(),
@@ -75,15 +80,14 @@ impl BodyParser for ShortDataPacket {
 
 impl fmt::Display for ShortDataPacket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{};{};{};{};{};{};{};{};{};{}", self.date, self.time, self.lat, self.lat_dir, self.lon, self.lon_dir, 
+        write!(f, "{};{};{};{};{};{};{};{};{}", self.timestamp, self.lat, self.lat_dir, self.lon, self.lon_dir, 
         self.speed, self.course, self.height, self.sats)
     }
 }
 
 impl PartialEq for ShortDataPacket {
     fn eq(&self, other: &Self) -> bool {
-        self.date == other.date 
-        && self.time == other.time
+        self.timestamp == other.timestamp 
         && self.lat == other.lat
         && self.lat_dir == other.lat_dir
         && self.lon == other.lon
@@ -176,6 +180,8 @@ mod tests {
 
     #[test]
     fn test_short_data_packet() {        
+        let test_ts = NaiveDateTime::parse_from_str("280421055220", "%d%m%y%H%M%S").unwrap();
+
         let p = Packet::from(&[0x23, 0x53, 0x44, 0x23, 0x32, 0x38, 0x30, 0x34, 0x32, 0x31, 0x3b, 0x30, 0x35, 0x35, 0x32, 
             0x32, 0x30, 0x3b, 0x35, 0x33, 0x35, 0x35, 0x2e, 0x30, 0x39, 0x32, 0x36, 0x30, 0x3b, 0x4e, 0x3b, 0x30, 0x32, 
             0x37, 0x33, 0x32, 0x2e, 0x34, 0x30, 0x39, 0x39, 0x30, 0x3b, 0x45, 0x3b, 0x30, 0x3b, 0x30, 0x3b, 0x33, 0x30, 
@@ -183,7 +189,8 @@ mod tests {
         assert_eq!(p.ptype, "SD");
 
         let msg = p.get_navigate_data().unwrap();
-        assert_eq!(msg.date, "280421");
-        assert_eq!(msg.sats, "7");
+
+        assert_eq!(msg.timestamp, test_ts);
+        assert_eq!(msg.sats, "7");        
     }
 }
