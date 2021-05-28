@@ -43,10 +43,10 @@ pub struct ShortDataPacket {
     timestamp: NaiveDateTime,
     lat: f64,
     lon: f64,
-    speed: String, 
-    course: String,
-    height: String,
-    sats: String,
+    speed: i16, 
+    course: i16,
+    height: i16,
+    sats: i16,
 }
 
 impl From<Vec<&str>> for ShortDataPacket {
@@ -70,10 +70,10 @@ impl From<Vec<&str>> for ShortDataPacket {
             timestamp:  NaiveDateTime::parse_from_str(ts.as_str(), "%d%m%y%H%M%S").unwrap(),
             lat: lat,
             lon: lon,
-            speed: body[6].to_string(),
-            course: body[7].to_string(),
-            height: body[8].to_string(),
-            sats: body[9].to_string(),
+            speed: body[6].to_string().parse().unwrap(),
+            course: body[7].to_string().parse().unwrap(),
+            height: body[8].to_string().parse().unwrap(),
+            sats: body[9].to_string().parse().unwrap(),
         }
     }
 }
@@ -195,6 +195,9 @@ mod tests {
         assert_eq!(msg.timestamp, test_ts);
         assert_eq!(msg.lon, 53.5509260);
         assert_eq!(msg.lat, 27.3240990);
-        assert_eq!(msg.sats, "7");        
+        assert_eq!(msg.speed, 0);        
+        assert_eq!(msg.course, 0);        
+        assert_eq!(msg.height, 300);        
+        assert_eq!(msg.sats, 7);        
     }
 }
