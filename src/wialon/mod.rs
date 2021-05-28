@@ -2,7 +2,6 @@ use core::any::Any;
 use std::fmt;
 
 trait BodyParser: fmt::Debug + fmt::Display{
-    fn parse(&mut self, body: Vec<&str>);
     fn as_any(&self) -> &dyn Any;
 }
 
@@ -12,21 +11,13 @@ pub struct LoginPacket {
     password: String,
 }
 
-impl LoginPacket {
-    fn new() -> LoginPacket {
-        LoginPacket{
-            imei: String::from(""), 
-            password: String::from("")
-        }
+impl From<Vec<&str>> for LoginPacket {
+    fn from(body: Vec<&str>) -> Self {
+        LoginPacket{imei: body[0].to_string(), password: body[1].to_string()}
     }
 }
 
 impl BodyParser for LoginPacket {
-    fn parse(&mut self, body: Vec<&str>) {
-        self.imei = body[0].to_string();
-        self.password = body[1].to_string();
-    }
-
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -58,37 +49,24 @@ pub struct ShortDataPacket {
     sats: String,
 }
 
-impl ShortDataPacket {    
-    fn new() -> Self {
+impl From<Vec<&str>> for ShortDataPacket {
+    fn from(body: Vec<&str>) -> Self {
         ShortDataPacket{
-            date: String::from(""),
-            time: String::from(""),
-            lat: String::from(""),
-            lat_dir: String::from(""),
-            lon: String::from(""),
-            lon_dir: String::from(""),
-            speed: String::from(""), 
-            course: String::from(""),
-            height: String::from(""),
-            sats: String::from(""),
+            date: body[0].to_string(),
+            time: body[1].to_string(),
+            lat: body[2].to_string(),
+            lat_dir: body[3].to_string(),
+            lon: body[4].to_string(),
+            lon_dir: body[5].to_string(),
+            speed: body[6].to_string(),
+            course: body[7].to_string(),
+            height: body[8].to_string(),
+            sats: body[9].to_string(),
         }
     }
 }
 
 impl BodyParser for ShortDataPacket {
-    fn parse(&mut self, body: Vec<&str>) {
-            self.date = body[0].to_string();
-            self.time = body[1].to_string();
-            self.lat = body[2].to_string();
-            self.lat_dir = body[3].to_string();
-            self.lon = body[4].to_string();
-            self.lon_dir = body[5].to_string();
-            self.speed = body[6].to_string();
-            self.course = body[7].to_string();
-            self.height = body[8].to_string();
-            self.sats = body[9].to_string();
-    }
-
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -136,13 +114,12 @@ impl Packet {
         let packet_type = parts[0]; 
         let body_parts: Vec<&str> = raw_body.split(";").collect();
         
-        let mut b: Box<dyn BodyParser>;
-        match packet_type {
-            "L" => b = Box::new(LoginPacket::new()),
-            "SD" => b = Box::new(ShortDataPacket::new()),
+        let b: Box<dyn BodyParser> = match packet_type {
+            "L" => Box::new(LoginPacket::from(body_parts)),
+            "SD" => Box::new(ShortDataPacket::from(body_parts)),
             _ => return Err("Не корректное сообщение"),
-        }
-        b.parse(body_parts);
+        };
+
         return Ok(Packet{ptype: packet_type.to_string(), body: b});    
     }
 
@@ -162,12 +139,6 @@ impl Packet {
         Ok(p)
     }
 }
-
-// impl PartialEq for Packet {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.ptype == other.ptype && self.body == other.body
-//     }
-// }
 
 impl fmt::Display for Packet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
