@@ -1,109 +1,15 @@
 use core::any::Any;
 use std::fmt;
-use chrono::NaiveDateTime;
+
+mod short_data_packet;
+use short_data_packet::{ShortDataPacket};
+
+mod login_packet;
+use login_packet::LoginPacket;
 
 trait BodyParser: fmt::Debug + fmt::Display{
     fn as_any(&self) -> &dyn Any;
 }
-
-#[derive(Debug)]
-pub struct LoginPacket {
-    imei: String,
-    password: String,
-}
-
-impl From<Vec<&str>> for LoginPacket {
-    fn from(body: Vec<&str>) -> Self {
-        LoginPacket{imei: body[0].to_string(), password: body[1].to_string()}
-    }
-}
-
-impl BodyParser for LoginPacket {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for LoginPacket {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{};{}", self.imei, self.password)
-    }
-}
-
-impl PartialEq for LoginPacket {
-    fn eq(&self, other: &Self) -> bool {
-        self.imei == other.imei && self.password == other.password
-    }
-}
-
-#[derive(Debug)]
-pub struct ShortDataPacket {
-    // date: String,
-    // time: String,
-    timestamp: NaiveDateTime,
-    lat: f64,
-    lon: f64,
-    speed: i16, 
-    course: i16,
-    height: i16,
-    sats: i16,
-}
-
-impl From<Vec<&str>> for ShortDataPacket {
-    fn from(body: Vec<&str>) -> Self {
-        let mut ts: String = body[0].to_string();
-        ts.push_str(body[1]);
-
-        let mut lon: f64 = body[2].to_string().parse().unwrap();
-        lon = lon / 100.0;
-        if body[3] != "N" {
-            lon = lon * -1.0
-        }
-
-        let mut lat: f64 = body[4].to_string().parse().unwrap();
-        lat = lat / 100.0;
-        if body[5] != "E" {
-            lon = lon * -1.0
-        }
-
-        ShortDataPacket{
-            timestamp:  NaiveDateTime::parse_from_str(ts.as_str(), "%d%m%y%H%M%S").unwrap(),
-            lat: lat,
-            lon: lon,
-            speed: body[6].to_string().parse().unwrap(),
-            course: body[7].to_string().parse().unwrap(),
-            height: body[8].to_string().parse().unwrap(),
-            sats: body[9].to_string().parse().unwrap(),
-        }
-    }
-}
-
-impl BodyParser for ShortDataPacket {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-
-impl fmt::Display for ShortDataPacket {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{};{};{};{};{};{};{}", self.timestamp, self.lat, self.lon, 
-        self.speed, self.course, self.height, self.sats)
-    }
-}
-
-impl PartialEq for ShortDataPacket {
-    fn eq(&self, other: &Self) -> bool {
-        self.timestamp == other.timestamp 
-        && self.lat == other.lat
-        && self.lon == other.lon
-        && self.speed == other.speed
-        && self.course == other.course
-        && self.height == other.height
-        && self.sats == other.sats
-    }
-}
-
 
 #[derive(Debug)]
 pub struct Packet {
@@ -156,7 +62,7 @@ impl fmt::Display for Packet {
 }
 
 #[test]
-fn parsing_incorrect_msg() {
+fn parsing_packets() {
     match Packet::from(&[0x77, 0x65, 0x72, 0x0a]) {
         Ok(_) => (),
         Err(err) => assert_eq!("Не корректное сообщение", err)
@@ -166,42 +72,34 @@ fn parsing_incorrect_msg() {
         Ok(_) => (),
         Err(err) => assert_eq!("Не корректное сообщение", err)
     }
-}
 
-#[test]
-fn test_login_packet() {
-    let p = Packet::from("#L#1;1\r\n".as_bytes()).unwrap();
-    assert_eq!(p.ptype, "L");
+    match Packet::from("#L#1;1\r\n".as_bytes()) {
+        Ok(p) => {
+            assert_eq!(p.ptype, "L");
     
-    let msg = p.get_auth_data().unwrap();
+            let msg = p.get_auth_data().unwrap();
 
-    assert_eq!(msg.imei, "1");
-    assert_eq!(msg.password, "1");
-}
+            assert_eq!(msg.imei, "1");
+            assert_eq!(msg.password, "1");
 
-#[test]
-fn test_short_data_packet() {    
+        },
+        Err(err) => panic!("{:?}", err)
+    }
+
+    use chrono::NaiveDateTime;
+    match Packet::from("#SD#280421;055447;5355.09260;N;02732.40990;E;60;0;300;7\r\n".as_bytes()) {
+        Ok(p) => {
+            assert_eq!(p.ptype, "SD");
+            let msg = p.get_navigate_data().unwrap();
     
-    let p = Packet::from("#SD#280421;055220;5355.09260;N;02732.40990;E;0;0;300;7\r\n".as_bytes()).unwrap();
-    assert_eq!(p.ptype, "SD");
-    
-    let msg = p.get_navigate_data().unwrap();
-    
-    let test_ts = NaiveDateTime::parse_from_str("280421055220", "%d%m%y%H%M%S").unwrap();
-    assert_eq!(msg.timestamp, test_ts);
-    assert_eq!(msg.lon, 53.5509260);
-    assert_eq!(msg.lat, 27.3240990);
-    assert_eq!(msg.speed, 0);        
-    assert_eq!(msg.course, 0);        
-    assert_eq!(msg.height, 300);        
-    assert_eq!(msg.sats, 7);        
-
-    let p = Packet::from("#SD#280421;055447;5355.09260;N;02732.40990;E;60;0;300;7\r\n".as_bytes()).unwrap();
-    assert_eq!(p.ptype, "SD");
-
-    let msg = p.get_navigate_data().unwrap();
-
-    let test_ts = NaiveDateTime::parse_from_str("280421055447", "%d%m%y%H%M%S").unwrap();
-    assert_eq!(msg.timestamp, test_ts);
-    assert_eq!(msg.speed, 60);        
+            assert_eq!(msg.timestamp, NaiveDateTime::parse_from_str("280421055447", "%d%m%y%H%M%S").unwrap());
+            assert_eq!(msg.lon, 53.5509260);
+            assert_eq!(msg.lat, 27.3240990);
+            assert_eq!(msg.speed, 60);        
+            assert_eq!(msg.course, 0);        
+            assert_eq!(msg.height, 300);        
+            assert_eq!(msg.sats, 7);        
+        },
+        Err(err) => panic!("{:?}", err)
+    }
 }
