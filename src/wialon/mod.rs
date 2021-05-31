@@ -155,49 +155,53 @@ impl fmt::Display for Packet {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parsing_incorrect_msg() {
-        match Packet::from(&[0x77, 0x65, 0x72, 0x0a]) {
-            Ok(_) => (),
-            Err(err) => assert_eq!("Не корректное сообщение", err)
-        }
-
-        match Packet::from(&[0x23, 0x77, 0x65, 0x72, 0x0a]) {
-            Ok(_) => (),
-            Err(err) => assert_eq!("Не корректное сообщение", err)
-        }
+#[test]
+fn parsing_incorrect_msg() {
+    match Packet::from(&[0x77, 0x65, 0x72, 0x0a]) {
+        Ok(_) => (),
+        Err(err) => assert_eq!("Не корректное сообщение", err)
     }
 
-    #[test]
-    fn test_login_packet() {
-        let p = Packet::from("#L#1;1\r\n".as_bytes()).unwrap();
-        assert_eq!(p.ptype, "L");
-        
-        let msg = p.get_auth_data().unwrap();
-
-        assert_eq!(msg.imei, "1");
-        assert_eq!(msg.password, "1");
+    match Packet::from(&[0x23, 0x77, 0x65, 0x72, 0x0a]) {
+        Ok(_) => (),
+        Err(err) => assert_eq!("Не корректное сообщение", err)
     }
+}
 
-    #[test]
-    fn test_short_data_packet() {    
-        let test_ts = NaiveDateTime::parse_from_str("280421055220", "%d%m%y%H%M%S").unwrap();
+#[test]
+fn test_login_packet() {
+    let p = Packet::from("#L#1;1\r\n".as_bytes()).unwrap();
+    assert_eq!(p.ptype, "L");
+    
+    let msg = p.get_auth_data().unwrap();
 
-        let p = Packet::from("#SD#280421;055220;5355.09260;N;02732.40990;E;0;0;300;7\r\n".as_bytes()).unwrap();
-        assert_eq!(p.ptype, "SD");
+    assert_eq!(msg.imei, "1");
+    assert_eq!(msg.password, "1");
+}
 
-        let msg = p.get_navigate_data().unwrap();
+#[test]
+fn test_short_data_packet() {    
+    
+    let p = Packet::from("#SD#280421;055220;5355.09260;N;02732.40990;E;0;0;300;7\r\n".as_bytes()).unwrap();
+    assert_eq!(p.ptype, "SD");
+    
+    let msg = p.get_navigate_data().unwrap();
+    
+    let test_ts = NaiveDateTime::parse_from_str("280421055220", "%d%m%y%H%M%S").unwrap();
+    assert_eq!(msg.timestamp, test_ts);
+    assert_eq!(msg.lon, 53.5509260);
+    assert_eq!(msg.lat, 27.3240990);
+    assert_eq!(msg.speed, 0);        
+    assert_eq!(msg.course, 0);        
+    assert_eq!(msg.height, 300);        
+    assert_eq!(msg.sats, 7);        
 
-        assert_eq!(msg.timestamp, test_ts);
-        assert_eq!(msg.lon, 53.5509260);
-        assert_eq!(msg.lat, 27.3240990);
-        assert_eq!(msg.speed, 0);        
-        assert_eq!(msg.course, 0);        
-        assert_eq!(msg.height, 300);        
-        assert_eq!(msg.sats, 7);        
-    }
+    let p = Packet::from("#SD#280421;055447;5355.09260;N;02732.40990;E;60;0;300;7\r\n".as_bytes()).unwrap();
+    assert_eq!(p.ptype, "SD");
+
+    let msg = p.get_navigate_data().unwrap();
+
+    let test_ts = NaiveDateTime::parse_from_str("280421055447", "%d%m%y%H%M%S").unwrap();
+    assert_eq!(msg.timestamp, test_ts);
+    assert_eq!(msg.speed, 60);        
 }
