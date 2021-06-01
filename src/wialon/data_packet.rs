@@ -20,7 +20,7 @@ pub struct DataPacket {
 impl From<Vec<&str>> for DataPacket {
     fn from(body: Vec<&str>) -> Self {
         let hdop = body[10].to_string().parse().unwrap();
-        let inputs = body[12].to_string().parse().unwrap();
+        let inputs = body[11].to_string().parse().unwrap();
         let outputs = body[12].to_string().parse().unwrap();
 
         DataPacket {
