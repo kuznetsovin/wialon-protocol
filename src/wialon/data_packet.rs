@@ -1,6 +1,5 @@
 use core::any::Any;
 
-use chrono::NaiveDateTime;
 use std::fmt;
 
 use crate::wialon::BodyParser;
@@ -63,6 +62,8 @@ impl PartialEq for DataPacket {
 
 #[test]
 fn test_short_data_packet_body() {
+    use chrono::NaiveDateTime;
+    
     let test_data = vec!("280421", "055429", "5355.09260", "N", "02732.40990",
                          "E", "0", "0", "300", "7", "22", "5", "0", "", "NA", "test1:1:1,var:2:4.5,texttest:3:1");
     let msg = DataPacket::from(test_data);
