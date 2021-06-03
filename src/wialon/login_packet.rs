@@ -1,8 +1,4 @@
-use core::any::Any;
-
 use std::fmt;
-
-use crate::wialon::BodyParser;
 
 #[derive(Debug)]
 pub struct LoginPacket {
@@ -13,12 +9,6 @@ pub struct LoginPacket {
 impl From<Vec<&str>> for LoginPacket {
     fn from(body: Vec<&str>) -> Self {
         LoginPacket{imei: body[0].to_string(), password: body[1].to_string()}
-    }
-}
-
-impl BodyParser for LoginPacket {
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

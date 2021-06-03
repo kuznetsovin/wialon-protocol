@@ -1,9 +1,5 @@
-use core::any::Any;
-
 use chrono::NaiveDateTime;
 use std::fmt;
-
-use crate::wialon::BodyParser;
 
 #[derive(Debug)]
 pub struct ShortDataPacket {
@@ -42,12 +38,6 @@ impl From<Vec<&str>> for ShortDataPacket {
             height: body[8].to_string().parse().unwrap(),
             sats: body[9].to_string().parse().unwrap(),
         }
-    }
-}
-
-impl BodyParser for ShortDataPacket {
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
