@@ -6,10 +6,13 @@ mod short_data_packet;
 use short_data_packet::ShortDataPacket;
 
 mod data_packet;
-mod login_packet;
+use data_packet::{DataPacket, Params};
 
-use crate::wialon::data_packet::{DataPacket, Params};
+mod login_packet;
 use login_packet::LoginPacket;
+
+mod response_packet;
+use response_packet::ResponsePacket;
 
 #[derive(Debug)]
 enum PacketTypes<'a> {
@@ -19,7 +22,7 @@ enum PacketTypes<'a> {
 }
 impl fmt::Display for PacketTypes<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{:?}", self)
     }
 }
 
@@ -30,6 +33,19 @@ pub struct Packet<'a> {
 }
 
 impl<'a> Packet<'a> {
+    pub fn response(&self, result_code: i8) -> Result<ResponsePacket, &str> {
+        let ptype: String = match self.ptype.as_str() {
+            "L" => String::from("AL"),
+            "SD" => String::from("ASD"),
+            "D" => String::from("AD"),
+            _ => return Err("Неизвестный тип пакета")
+        };
+
+        Ok(ResponsePacket{
+            ptype,
+            code: result_code
+        })
+    }
     pub fn from(msg: &'a [u8]) -> Result<Packet, &str> {
         let s = str::from_utf8(msg).unwrap();
         if !(s.starts_with("#") && s.ends_with("\r\n")) {
@@ -146,6 +162,30 @@ fn parsing_packets() {
 
             assert_eq!(p.get_extra_param("test1").unwrap(), &Params::Int(1));
             assert_eq!(p.get_extra_param("var").unwrap(), &Params::Float(4.5));
+        }
+        Err(err) => panic!("{:?}", err)
+    }
+}
+
+#[test]
+fn response_packets() {
+    match Packet::from("#L#1;1\r\n".as_bytes()) {
+        Ok(p) => assert_eq!(p.response(1).unwrap().to_string(), "#AL#1\r\n"),
+        Err(err) => panic!("{:?}", err),
+    }
+
+    match Packet::from("#SD#280421;055447;5355.09260;N;02732.40990;E;60;0;300;7\r\n".as_bytes()) {
+        Ok(p) => {
+            let r = p.response(1).unwrap();
+            assert_eq!(r.to_string(), "#ASD#1\r\n")
+        }
+        Err(err) => panic!("{:?}", err),
+    }
+
+    match Packet::from("#D#280421;055500;5355.09260;N;02732.40990;E;60;0;300;7;22;5;5120;;eee;test1:1:1,var:2:4.5,texttest:3:1\r\n".as_bytes()) {
+        Ok(p) => {
+            let r = p.response(1).unwrap();
+            assert_eq!(r.to_string(), "#AD#1\r\n")
         }
         Err(err) => panic!("{:?}", err)
     }
