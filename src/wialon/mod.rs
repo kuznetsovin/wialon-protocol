@@ -9,7 +9,7 @@ mod login_packet;
 mod data_packet;
 
 use login_packet::LoginPacket;
-use crate::wialon::data_packet::DataPacket;
+use crate::wialon::data_packet::{DataPacket, Params};
 
 trait BodyParser: fmt::Debug + fmt::Display {
     fn as_any(&self) -> &dyn Any;
@@ -60,6 +60,19 @@ impl Packet {
             },
         };
         Ok(p)
+    }
+
+    pub fn get_extra_param(&self, param_name: &str) -> Result<Params, &str> {
+        let p: &Params = match self.body.as_any().downcast_ref::<DataPacket>() {
+            Some(b) => {
+                match b.params.get(param_name) {
+                    Some(r) => r,
+                    None => return Err("Ошибка получения параметра"),
+                }
+            },
+            None => return Err("Ошибка преобразования: пакет не содержит доп параметров"),
+        };
+        Ok(*p)
     }
 }
 
@@ -116,6 +129,9 @@ fn parsing_packets() {
             let msg = p.get_navigate_data().unwrap();
 
             assert_eq!(msg.timestamp, NaiveDateTime::parse_from_str("280421055500", "%d%m%y%H%M%S").unwrap());
+
+            assert_eq!(p.get_extra_param("test1").unwrap(), Params::Int(1));
+            assert_eq!(p.get_extra_param("var").unwrap(), Params::Float(4.5));
         }
         Err(err) => panic!("{:?}", err)
     }
