@@ -12,9 +12,8 @@ with open("test_packet.txt", "rb") as f:
     for rec in f.readlines():
         print("send: {}".format(rec))
         client.send(rec)
-
-        # rec_package = client.recv(BUFF)
-        # print("received: {}".format(rec_package.hex()))
+        rec_package = client.recv(BUFF)
+        print("received: {}".format(rec_package.hex()))
         sleep(1)
 
 client.close()

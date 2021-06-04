@@ -28,7 +28,7 @@ impl fmt::Display for PacketTypes<'_> {
 
 #[derive(Debug)]
 pub struct Packet<'a> {
-    ptype: String,
+    pub ptype: String,
     body: PacketTypes<'a>,
 }
 
@@ -70,6 +70,10 @@ impl<'a> Packet<'a> {
         });
     }
 
+    pub fn is_auth_packet(&self) -> bool {
+        self.ptype.as_str() == "L"
+    }
+
     pub fn get_auth_data(&self) -> Result<&LoginPacket, &str> {
         let p: &LoginPacket = match &self.body {
             PacketTypes::LoginPacket(b) => b,
@@ -88,6 +92,7 @@ impl<'a> Packet<'a> {
         Ok(p)
     }
 
+    #[warn(dead_code)]
     pub fn get_extra_param(&self, param_name: &str) -> Result<&Params, &str> {
         let p: &DataPacket<'_> = match &self.body {
             PacketTypes::LoginPacket(_) => return Err("Пакет не содержит экстра данных"),
