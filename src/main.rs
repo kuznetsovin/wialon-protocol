@@ -73,3 +73,50 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     start_server("0.0.0.0:5555").await
 }
+
+#[test]
+fn test_login_packet_body() {
+    use tokio::runtime::Runtime;
+    use std::{thread, time};
+    use std::io::prelude::*;
+    use std::net::TcpStream;
+
+    thread::spawn(move || {
+        let rt = Runtime::new().unwrap();
+
+        loop {
+            rt.block_on(start_server("0.0.0.0:5555")).unwrap();
+        }
+    });
+    // TODO: replace to channel
+    thread::sleep(time::Duration::from_secs(1));
+
+    let mut stream = TcpStream::connect("0.0.0.0:5555").unwrap();
+    let rlt = &mut [0; 128];
+
+    match stream.write(b"#L#1;1\r\n") {
+        Ok(_) => {
+            let sz = stream.read(rlt).unwrap();
+            assert_eq!(&rlt[0..sz], b"#AL#1\r\n")
+        },
+        Err(e) => panic!("{}", e),
+    };
+
+    match stream.write(b"#SD#280421;055447;5355.09260;N;02732.40990;E;60;0;300;7\r\n") {
+        Ok(_) => {
+            let sz = stream.read(rlt).unwrap();
+            assert_eq!(&rlt[0..sz], b"#ASD#1\r\n")
+        },
+        Err(e) => panic!("{}", e),
+    };
+
+    match stream.write(b"#D#280421;055500;5355.09260;N;02732.40990;E;60;0;300;7;22;5;5120;;eee;test1:1:1,var:2:4.5,texttest:3:1\r\n") {
+        Ok(_) => {
+            let sz = stream.read(rlt).unwrap();
+            assert_eq!(&rlt[0..sz], b"#AD#1\r\n")
+        },
+        Err(e) => panic!("{}", e),
+    };
+}
+
+
