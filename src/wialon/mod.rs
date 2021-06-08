@@ -12,7 +12,7 @@ mod login_packet;
 use login_packet::LoginPacket;
 
 mod response_packet;
-use response_packet::ResponsePacket;
+pub use response_packet::ResponsePacket;
 
 #[derive(Debug)]
 enum PacketTypes<'a> {
