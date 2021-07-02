@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::collections::VecDeque;
 use std::env;
+use std::str;
+use std::slice;
 
 mod wialon;
 
@@ -15,12 +17,13 @@ use log::{info, error};
 // Setup some tokens to allow us to identify which event is for which socket.
 const SERVER: Token = Token(0);
 
-struct Connection {
+struct Connection<'a> {
+    imei: &'a str,
     socket: TcpStream,
     queue: VecDeque<wialon::ResponsePacket>,
 }
 
-impl Source for Connection {
+impl<'a> Source for Connection<'a> {
     fn register(&mut self, registry: &Registry, token: Token, interests: Interest)
         -> io::Result<()>
     {    
@@ -38,9 +41,10 @@ impl Source for Connection {
     }
 }
 
-impl Connection {
-    fn new(c: TcpStream) -> Connection {    
+impl<'a> Connection<'a> {
+    fn new(c: TcpStream) -> Connection<'a> {    
         Connection{
+            imei: "",
             socket: c,
             queue: VecDeque::new(),
         }
@@ -75,10 +79,20 @@ impl Connection {
                     info!("receiver packet: {:?}", p);
                     if p.is_auth_packet() {
                         // TODO: auth process
-                        info!("auth: {:?}", p.get_auth_data());
+                        let auth = p.get_auth_data().unwrap();
+                        info!("auth: {:?}", auth);
+                        
+                        let imei = auth.imei.as_str();
+                        let ptr = imei.as_ptr();                        
+                        let len = imei.len();
+                        self.imei = unsafe {
+                            let slice = slice::from_raw_parts(ptr, len);
+                            str::from_utf8(slice).unwrap()
+                        };
+
                     } else {
                         // TODO: create store interface
-                        info!("position: {:?}", p.get_navigate_data());
+                        info!("client: {:?}, position: {:?}", self.imei, p.get_navigate_data());                
                     }
 
                     match p.response(1) {
@@ -124,7 +138,7 @@ impl Connection {
 struct Server {
     addr: SocketAddr,
     current_conn_token: Token,
-    connections: HashMap<Token, Connection> 
+    connections: HashMap<Token, Connection<'static>> 
 }
 
 impl Server {
