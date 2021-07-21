@@ -163,8 +163,8 @@ struct Server {
 }
 
 impl Server {
-    fn new(addr: &str) -> Server {
-        let (sender, receiver) = sync_channel::<GeoPacket>(1000);
+    fn new(addr: &str, buf_size: usize) -> Server {
+        let (sender, receiver) = sync_channel::<GeoPacket>(buf_size);
 
         thread::spawn(move|| {
             loop {
@@ -235,7 +235,7 @@ fn main() -> io::Result<()> {
     env::set_var("RUST_LOG", "info");
     env_logger::init();
 
-    let mut s = Server::new("0.0.0.0:5555");
+    let mut s = Server::new("0.0.0.0:5555", 1000);
     s.start()
 }
 
@@ -250,7 +250,7 @@ fn test_server() {
 
     let addr = "0.0.0.0:5555";
     thread::spawn(move || {
-        let mut s = Server::new(addr);
+        let mut s = Server::new(addr, 100);
         s.start()
     });
     // TODO: replace to channel
