@@ -8,7 +8,7 @@ use std::sync::mpsc::{sync_channel, SyncSender};
 
 use log::info;
 use crate::connection::Connection;
-use crate::GeoPacket;
+use crate::store::GeoPacket;
 
 // mod connection;
 // Setup some tokens to allow us to identify which event is for which socket.
