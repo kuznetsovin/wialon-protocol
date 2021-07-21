@@ -7,7 +7,7 @@ use std::io;
 use std::sync::mpsc::SyncSender;
 use crate::wialon;
 use crate::store::GeoPacket;
-us˚e crate::wialon::ResponsePacket;
+use crate::wialon::ResponsePacket;
 use std::io::{Read, Write};
 
 pub struct Connection {
