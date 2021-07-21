@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use chrono::NaiveDateTime;
 use mio::net::{TcpListener, TcpStream};
 use mio::event::Source;
 use mio::{Events, Interest, Registry, Poll, Token};
@@ -6,23 +7,51 @@ use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::env;
 use std::str;
-use std::slice;
+// use std::slice;
+use serde::{Serialize};
 
 mod wialon;
 
 use log::{info, error};
 use crate::wialon::ResponsePacket;
+use crate::wialon::ShortDataPacket;
 
+#[derive(Serialize)]
+struct GeoPacket {
+    imei: String,
+    timestamp: NaiveDateTime,
+    lat: f64,
+    lon: f64,
+    speed: i16,
+    course: i16,
+    height: i16,
+    sats: i16,
+}
+
+impl GeoPacket {
+    fn new(client: Vec<u8>, data: &ShortDataPacket) -> GeoPacket {
+        return GeoPacket {
+            imei: String::from_utf8(client).unwrap(),
+            timestamp: data.timestamp,
+            lat: data.lat,
+            lon: data.lon,
+            speed: data.speed,
+            course: data.course,
+            height: data.height,
+            sats: data.sats,
+        };
+    }
+}
 
 // Setup some tokens to allow us to identify which event is for which socket.
 const SERVER: Token = Token(0);
 
-struct Connection<'a> {
-    imei: &'a str,
+struct Connection {
+    imei: Vec<u8>,
     socket: TcpStream,
 }
 
-impl<'a> Source for Connection<'a> {
+impl Source for Connection {
     fn register(&mut self, registry: &Registry, token: Token, interests: Interest)
                 -> io::Result<()>
     {
@@ -40,10 +69,10 @@ impl<'a> Source for Connection<'a> {
     }
 }
 
-impl<'a> Connection<'a> {
-    fn new(c: TcpStream) -> Connection<'a> {
+impl Connection {
+    fn new(c: TcpStream) -> Connection {
         Connection {
-            imei: "",
+            imei: vec![0, 100],
             socket: c,
         }
     }
@@ -80,16 +109,15 @@ impl<'a> Connection<'a> {
                         let auth = p.get_auth_data().unwrap();
                         info!("auth: {:?}", auth);
 
-                        let imei = auth.imei.as_str();
-                        let ptr = imei.as_ptr();
-                        let len = imei.len();
-                        self.imei = unsafe {
-                            let slice = slice::from_raw_parts(ptr, len);
-                            str::from_utf8(slice).unwrap()
-                        };
+                        self.imei = auth.imei.as_bytes().to_vec();
                     } else {
                         // TODO: create store interface
-                        info!("client: {:?}, position: {:?}", self.imei, p.get_navigate_data());
+                        let geo = GeoPacket::new(
+                            self.imei.to_owned(),
+                            p.get_navigate_data().unwrap(),
+                        );
+                        let inf = serde_json::to_string(&geo)?;
+                        info!("{:?}", inf);
                     }
 
                     match p.response(1) {
@@ -131,7 +159,7 @@ impl<'a> Connection<'a> {
 struct Server {
     addr: SocketAddr,
     current_conn_token: Token,
-    connections: HashMap<Token, Connection<'static>>,
+    connections: HashMap<Token, Connection>,
 }
 
 impl Server {
@@ -202,6 +230,9 @@ fn main() -> io::Result<()> {
 
 #[test]
 fn test_server() {
+    env::set_var("RUST_LOG", "info");
+    env_logger::init();
+
     use std::{thread, time};
     use std::io::prelude::*;
     use std::net::TcpStream;

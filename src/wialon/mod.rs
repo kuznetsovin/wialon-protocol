@@ -3,7 +3,7 @@ use std::str;
 
 mod short_data_packet;
 
-use short_data_packet::ShortDataPacket;
+pub use short_data_packet::ShortDataPacket;
 
 mod data_packet;
 use data_packet::{DataPacket, Params};
