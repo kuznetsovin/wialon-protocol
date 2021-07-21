@@ -7,10 +7,11 @@ mod wialon;
 mod server;
 mod connection;
 mod store;
+mod default_store;
 
 
 use crate::server::Server;
-use crate::store::ConsoleStore;
+use crate::default_store::ConsoleStore;
 
 fn main() -> io::Result<()> {
     env::set_var("RUST_LOG", "info");

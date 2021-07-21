@@ -3,6 +3,10 @@ use serde::{Serialize};
 
 use crate::wialon::ShortDataPacket;
 
+pub trait Store {
+    fn save(&self, p: GeoPacket);
+}
+
 #[derive(Serialize, Debug)]
 pub struct GeoPacket {
     imei: String,
@@ -27,25 +31,5 @@ impl GeoPacket {
             height: data.height,
             sats: data.sats,
         };
-    }
-}
-
-pub trait Store {
-    fn save(&self, p: GeoPacket);
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct ConsoleStore {}
-
-impl ConsoleStore{
-    pub fn new() -> ConsoleStore {
-        return ConsoleStore{}
-    }
-}
-
-impl Store for ConsoleStore {
-    fn save(&self, p: GeoPacket) {
-        let packet_json = serde_json::to_string(&p).unwrap();
-        println!("{:?}", packet_json);
     }
 }
