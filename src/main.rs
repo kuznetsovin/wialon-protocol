@@ -10,6 +10,7 @@ mod store;
 
 
 use crate::server::Server;
+use crate::store::ConsoleStore;
 
 fn main() -> io::Result<()> {
     env::set_var("RUST_LOG", "info");
@@ -32,7 +33,8 @@ fn main() -> io::Result<()> {
         }
     };
 
-    let mut s = Server::new(addr, buf_size);
+    let db = ConsoleStore::new();
+    let mut s = Server::new(addr, buf_size, db);
     s.start()
 }
 
@@ -47,7 +49,8 @@ fn test_server() {
 
     let addr = "0.0.0.0:5555";
     thread::spawn(move || {
-        let mut s = Server::new(addr, 100);
+        let db = ConsoleStore::new();
+        let mut s = Server::new(addr, 100, db);
         s.start()
     });
     // TODO: replace to channel

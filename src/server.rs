@@ -8,7 +8,7 @@ use std::sync::mpsc::{sync_channel, SyncSender};
 
 use log::info;
 use crate::connection::Connection;
-use crate::store::GeoPacket;
+use crate::store::{GeoPacket, Store};
 
 // mod connection;
 // Setup some tokens to allow us to identify which event is for which socket.
@@ -22,14 +22,13 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(addr: &str, buf_size: usize) -> Server {
+    pub fn new<T: 'static + Store + Send>(addr: &str, buf_size: usize, db: T) -> Server {
         let (sender, receiver) = sync_channel::<GeoPacket>(buf_size);
 
         thread::spawn(move || {
             loop {
                 let p = receiver.recv().unwrap();
-                let packet_json = serde_json::to_string(&p).unwrap();
-                println!("{:?}", packet_json);
+                db.save(p)
             }
         });
 
