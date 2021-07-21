@@ -75,7 +75,7 @@ impl Connection {
         Connection {
             imei: vec![0, 100],
             socket: c,
-            bus
+            bus,
         }
     }
     fn get_message(&mut self) -> io::Result<bool> {
@@ -166,7 +166,7 @@ impl Server {
     fn new(addr: &str, buf_size: usize) -> Server {
         let (sender, receiver) = sync_channel::<GeoPacket>(buf_size);
 
-        thread::spawn(move|| {
+        thread::spawn(move || {
             loop {
                 let p = receiver.recv().unwrap();
                 let packet_json = serde_json::to_string(&p).unwrap();
@@ -178,7 +178,7 @@ impl Server {
             addr: addr.parse().unwrap(),
             current_conn_token: Token(SERVER.0 + 1),
             connections: HashMap::new(),
-            bus: sender
+            bus: sender,
         }
     }
     fn start(&mut self) -> io::Result<()> {
@@ -235,7 +235,24 @@ fn main() -> io::Result<()> {
     env::set_var("RUST_LOG", "info");
     env_logger::init();
 
-    let mut s = Server::new("0.0.0.0:5555", 1000);
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 3 {
+        println!("usage: wialon-protocol <listner_addr> <buf_size>");
+        return Ok(());
+    }
+
+    let addr: &str = &args[1];
+
+    let buf_size: usize = match args[2].parse() {
+        Ok(n) => n,
+        Err(_) => {
+            println!("Required param buf size not found");
+            return Ok(());
+        }
+    };
+
+    let mut s = Server::new(addr, buf_size);
     s.start()
 }
 
