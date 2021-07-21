@@ -5,9 +5,9 @@ use mio::event::Source;
 use mio::{Events, Interest, Registry, Poll, Token};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
-use std::env;
+use std::{env, thread};
 use std::str;
-// use std::slice;
+use std::sync::mpsc::{sync_channel, SyncSender};
 use serde::{Serialize};
 
 mod wialon;
@@ -16,7 +16,7 @@ use log::{info, error};
 use crate::wialon::ResponsePacket;
 use crate::wialon::ShortDataPacket;
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct GeoPacket {
     imei: String,
     timestamp: NaiveDateTime,
@@ -49,6 +49,7 @@ const SERVER: Token = Token(0);
 struct Connection {
     imei: Vec<u8>,
     socket: TcpStream,
+    bus: SyncSender<GeoPacket>,
 }
 
 impl Source for Connection {
@@ -70,10 +71,11 @@ impl Source for Connection {
 }
 
 impl Connection {
-    fn new(c: TcpStream) -> Connection {
+    fn new(c: TcpStream, bus: SyncSender<GeoPacket>) -> Connection {
         Connection {
             imei: vec![0, 100],
             socket: c,
+            bus
         }
     }
     fn get_message(&mut self) -> io::Result<bool> {
@@ -111,13 +113,10 @@ impl Connection {
 
                         self.imei = auth.imei.as_bytes().to_vec();
                     } else {
-                        // TODO: create store interface
-                        let geo = GeoPacket::new(
+                        self.bus.send(GeoPacket::new(
                             self.imei.to_owned(),
                             p.get_navigate_data().unwrap(),
-                        );
-                        let inf = serde_json::to_string(&geo)?;
-                        info!("{:?}", inf);
+                        )).unwrap();
                     }
 
                     match p.response(1) {
@@ -160,14 +159,26 @@ struct Server {
     addr: SocketAddr,
     current_conn_token: Token,
     connections: HashMap<Token, Connection>,
+    bus: SyncSender<GeoPacket>,
 }
 
 impl Server {
     fn new(addr: &str) -> Server {
+        let (sender, receiver) = sync_channel::<GeoPacket>(1000);
+
+        thread::spawn(move|| {
+            loop {
+                let p = receiver.recv().unwrap();
+                let packet_json = serde_json::to_string(&p).unwrap();
+                println!("{:?}", packet_json);
+            }
+        });
+
         Server {
             addr: addr.parse().unwrap(),
             current_conn_token: Token(SERVER.0 + 1),
             connections: HashMap::new(),
+            bus: sender
         }
     }
     fn start(&mut self) -> io::Result<()> {
@@ -197,7 +208,7 @@ impl Server {
                         let token = self.next_token();
                         poll.registry().register(&mut connection, token, Interest::READABLE)?;
 
-                        self.connections.insert(token, Connection::new(connection));
+                        self.connections.insert(token, Connection::new(connection, self.bus.to_owned()));
                     },
                     token => {
                         let connection = self.connections.get_mut(&token).unwrap();
@@ -230,7 +241,7 @@ fn main() -> io::Result<()> {
 
 #[test]
 fn test_server() {
-    env::set_var("RUST_LOG", "info");
+    env::set_var("RUST_LOG", "debug");
     env_logger::init();
 
     use std::{thread, time};
