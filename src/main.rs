@@ -4,7 +4,6 @@ use mio::event::Source;
 use mio::{Events, Interest, Registry, Poll, Token};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
-use std::collections::VecDeque;
 use std::env;
 use std::str;
 use std::slice;
@@ -12,6 +11,7 @@ use std::slice;
 mod wialon;
 
 use log::{info, error};
+use crate::wialon::ResponsePacket;
 
 
 // Setup some tokens to allow us to identify which event is for which socket.
@@ -20,19 +20,18 @@ const SERVER: Token = Token(0);
 struct Connection<'a> {
     imei: &'a str,
     socket: TcpStream,
-    queue: VecDeque<wialon::ResponsePacket>,
 }
 
 impl<'a> Source for Connection<'a> {
     fn register(&mut self, registry: &Registry, token: Token, interests: Interest)
-        -> io::Result<()>
-    {    
+                -> io::Result<()>
+    {
         self.socket.register(registry, token, interests)
     }
 
     fn reregister(&mut self, registry: &Registry, token: Token, interests: Interest)
-        -> io::Result<()>
-    {    
+                  -> io::Result<()>
+    {
         self.socket.reregister(registry, token, interests)
     }
 
@@ -42,14 +41,13 @@ impl<'a> Source for Connection<'a> {
 }
 
 impl<'a> Connection<'a> {
-    fn new(c: TcpStream) -> Connection<'a> {    
-        Connection{
+    fn new(c: TcpStream) -> Connection<'a> {
+        Connection {
             imei: "",
             socket: c,
-            queue: VecDeque::new(),
         }
     }
-    fn get_message(&mut self) -> io::Result<bool>{
+    fn get_message(&mut self) -> io::Result<bool> {
         let mut connection_closed = false;
         let mut read_bytes = 0;
         let mut buf = vec![0; 2048];
@@ -60,10 +58,10 @@ impl<'a> Connection<'a> {
                     break;
                 }
                 Ok(n) => {
-                    read_bytes += n;   
+                    read_bytes += n;
                     if read_bytes == buf.len() {
                         buf.resize(buf.len() + 1024, 0);
-                    }                 
+                    }
                 }
                 Err(err) => match err.kind() {
                     io::ErrorKind::WouldBlock => break,
@@ -74,36 +72,35 @@ impl<'a> Connection<'a> {
         }
 
         if read_bytes > 0 {
-            match wialon::Packet::from(&buf[..read_bytes]){
+            match wialon::Packet::from(&buf[..read_bytes]) {
                 Ok(p) => {
                     info!("receiver packet: {:?}", p);
                     if p.is_auth_packet() {
                         // TODO: auth process
                         let auth = p.get_auth_data().unwrap();
                         info!("auth: {:?}", auth);
-                        
+
                         let imei = auth.imei.as_str();
-                        let ptr = imei.as_ptr();                        
+                        let ptr = imei.as_ptr();
                         let len = imei.len();
                         self.imei = unsafe {
                             let slice = slice::from_raw_parts(ptr, len);
                             str::from_utf8(slice).unwrap()
                         };
-
                     } else {
                         // TODO: create store interface
-                        info!("client: {:?}, position: {:?}", self.imei, p.get_navigate_data());                
+                        info!("client: {:?}, position: {:?}", self.imei, p.get_navigate_data());
                     }
 
                     match p.response(1) {
-                        Ok(r) => self.queue.push_back(r),
+                        Ok(r) => self.send_message(r)?,
                         Err(err) => error!("{:?}", err),
-                    }                                                     
-                },
-                Err(err) => error!("{:?}", err),                      
-            }            
+                    }
+                }
+                Err(err) => error!("{:?}", err),
+            }
         }
-        
+
 
         if connection_closed {
             return Ok(true);
@@ -112,18 +109,14 @@ impl<'a> Connection<'a> {
         Ok(false)
     }
 
-    fn send_message(&mut self) -> io::Result<bool>{
-        let msg = match self.queue.pop_front(){
-            Some(m) => m,
-            _ => return Ok(false),
-        }; 
+    fn send_message(&mut self, msg: ResponsePacket) -> io::Result<()> {
         loop {
             match self.socket.write_all(msg.to_string().as_bytes()) {
                 Ok(_) => {
-                    return Ok(true)                                        
-                },
+                    return Ok(());
+                }
                 Err(err) => match err.kind() {
-                    io::ErrorKind::WouldBlock => {},
+                    io::ErrorKind::WouldBlock => {}
                     io::ErrorKind::Interrupted => continue,
                     _ => return {
                         error!("failed send ack: {:?}", err);
@@ -131,22 +124,22 @@ impl<'a> Connection<'a> {
                     }
                 }
             }
-        }        
+        }
     }
 }
 
 struct Server {
     addr: SocketAddr,
     current_conn_token: Token,
-    connections: HashMap<Token, Connection<'static>> 
+    connections: HashMap<Token, Connection<'static>>,
 }
 
 impl Server {
     fn new(addr: &str) -> Server {
-        Server{
+        Server {
             addr: addr.parse().unwrap(),
             current_conn_token: Token(SERVER.0 + 1),
-            connections:  HashMap::new(),
+            connections: HashMap::new(),
         }
     }
     fn start(&mut self) -> io::Result<()> {
@@ -179,21 +172,15 @@ impl Server {
                         self.connections.insert(token, Connection::new(connection));
                     },
                     token => {
-                        let connection = self.connections.get_mut(&token).unwrap(); 
-                        if event.is_writable() {                            
-                            connection.send_message()?;
-                            poll.registry().reregister(connection, event.token(), Interest::READABLE)?;
-                        }
-
+                        let connection = self.connections.get_mut(&token).unwrap();
                         if event.is_readable() {
                             let r = connection.get_message()?;
-                            poll.registry().reregister(connection, event.token(), Interest::WRITABLE)?;
                             if r {
                                 info!("Connection closed");
                                 self.connections.remove(&token);
                             }
                         }
-                    } 
+                    }
                 }
             }
         }
@@ -234,7 +221,7 @@ fn test_server() {
         Ok(_) => {
             let sz = stream.read(rlt).unwrap();
             assert_eq!(&rlt[0..sz], b"#AL#1\r\n")
-        },
+        }
         Err(e) => panic!("{}", e),
     };
 
@@ -242,7 +229,7 @@ fn test_server() {
         Ok(_) => {
             let sz = stream.read(rlt).unwrap();
             assert_eq!(&rlt[0..sz], b"#ASD#1\r\n")
-        },
+        }
         Err(e) => panic!("{}", e),
     };
 
@@ -250,12 +237,12 @@ fn test_server() {
         Ok(_) => {
             let sz = stream.read(rlt).unwrap();
             assert_eq!(&rlt[0..sz], b"#AD#1\r\n")
-        },
+        }
         Err(e) => panic!("{}", e),
     };
 
     match stream.write(b"#ASD#1\n") {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => panic!("{}", e),
     };
 }

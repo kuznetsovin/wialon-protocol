@@ -63,13 +63,6 @@ impl<'a> From<Vec<&'a str>> for DataPacket<'a> {
     }
 }
 
-// impl<'a> BodyParser for DataPacket<'a> {
-//     fn as_any(&self) -> &dyn Any {
-//         self
-//     }
-// }
-
-
 impl fmt::Display for DataPacket<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{};{};{};{};{};{}", self.spd, self.hdop, self.inputs, self.outputs,
